@@ -1,0 +1,11 @@
+.about {
+    margin-top: 20px;
+}
+
+.about__title {
+    font-weight: 600;
+}
+
+.about__text-block {
+    margin: 10px auto;
+}

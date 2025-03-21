@@ -1,0 +1,31 @@
+.user-orders{
+    display: flex;
+    flex-direction:column ;
+    gap: 5px;
+}
+.orders__order{
+    display: flex;
+    flex-direction: column;
+    border: 2px solid #ddd;
+    padding: 10px;
+}
+.order__number{
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.order__status{
+    display: flex;
+    background: #e4e4e4ed;
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+.user-logout__button {
+    display: block;
+    margin: 0 auto ;
+    margin-top: 20px ;
+    border: none;
+    background: transparent;
+    color: #353535;
+    text-decoration: underline;
+}
