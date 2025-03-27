@@ -9,10 +9,26 @@ class Product extends Model
 {
     use HasFactory;
 
-    // Указываем, какие поля могут быть массово присвоены
-    protected $fillable = [
-        'title', 'price', 'img', 'product_type', 'country', 'color', 'qty', 'description',
+       protected $fillable = [
+        'title',
+        'price',
+        'img',
+        'product_type',
+        'country',
+        'color',
+        'qty',
+        'description',
     ];
 
-    // Если необходимо, добавьте методы и связи
+   
+    public function category()
+    {
+        return $this->belongsTo(Category::class, 'product_type');
+    }
+
+   
+    public function cartItems()
+    {
+        return $this->hasMany(Cart::class, 'pid');
+    }
 }

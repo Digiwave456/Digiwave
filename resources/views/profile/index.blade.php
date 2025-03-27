@@ -10,7 +10,7 @@
                      class="profile-image">
                      <div class="user-profile">
                 <h2 class="profile-title">
-                   <p> {{ Auth::user()->name }}</p><p> {{ Auth::user()->surname }}</p>
+                   <p>Добро пожаловать, {{ Auth::user()->name }}</p>
                 </h2>
             </div>
 </div>
