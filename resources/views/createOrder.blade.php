@@ -1,96 +1,69 @@
 @extends('layouts.app')
 @section('content')
-
-<div class="container">
-    <div class="cart">
-        <h3 class="about__title text-start mb-4">Оформление заказа</h3>
-        
-        <table class="cart__table">
-            <thead>
-            <tr>
-                <th>Название</th>
-                <th>Количество</th>
-                <th>Цена</th>
-                <th>Итого</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($cart as $item)
-                <tr class="cart__raw">
-                    <td>{{$item->title}}</td>
-                    <td class="cart__qty">
-                        <span class="cart__qty-value">
-                            {{ $item->qty }}
-                        </span>
-                    </td>
-                    <td>{{$item->price}} ₽</td>
-                    <td>{{$item->price * $item->qty}} ₽</td>
-                </tr>
-            @endforeach
-            </tbody>
-        </table>
-        
-        <div class="order-total">
-            К оплате: <span class="order-total__price">{{ $total }} ₽</span>
-        </div>
-        
-        <form class="order-form">
-            @csrf
-            <div class="form-group">
-                <input type="password" 
-                       id="password" 
-                       class="form-input" 
-                       name="password" 
-                       placeholder="Введите пароль" 
-                       required>
+    <div class="container">
+        @if (session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
             </div>
-            <button type="button" id="submitBtn" class="form-button">
-                Сформировать заказ
-            </button>
-        </form>
+        @endif
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>{{ __('messages.order.create') }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ route('order.store') }}" method="POST">
+                            @csrf
+                            <div class="mb-3">
+                                <label for="name" class="form-label">{{ __('messages.order.name') }}</label>
+                                <input type="text" class="form-control" id="name" name="name" value="{{ auth()->user()->name }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">{{ __('messages.order.email') }}</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ auth()->user()->email }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">{{ __('messages.order.phone') }}</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ auth()->user()->phone }}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">{{ __('messages.order.address') }}</label>
+                                <textarea class="form-control" id="address" name="address" rows="3" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="comment" class="form-label">{{ __('messages.order.comment') }}</label>
+                                <textarea class="form-control" id="comment" name="comment" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">{{ __('messages.order.submit') }}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>{{ __('messages.order.summary') }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table">
+                            <tbody>
+                                @foreach($cart as $item)
+                                <tr>
+                                    <td>{{ $item->title }} x {{ $item->qty }}</td>
+                                    <td class="text-end">{{ number_format($item->price * $item->qty, 0, ',', ' ') }} ₽</td>
+                                </tr>
+                                @endforeach
+                                <tr>
+                                    <td><strong>{{ __('messages.order.total') }}</strong></td>
+                                    <td class="text-end"><strong>{{ number_format($total, 0, ',', ' ') }} ₽</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-
-<!-- Подключаем скрипты -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-$(document).ready(function() {
-    $('#submitBtn').click(function() {
-        var password = $('#password').val();
-        
-        $.post('/create-order', {
-            password: password,
-            _token: '{{ csrf_token() }}'
-        })
-        .done(function(response) {
-            Swal.fire({
-                title: 'Успех!',
-                text: response.message,
-                icon: 'success',
-                confirmButtonText: 'OK',
-                background: '#1c1c1e',
-                color: '#ffffff',
-                confirmButtonColor: '#34c38f'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = '/user';
-                }
-            });
-        })
-        .fail(function() {
-            Swal.fire({
-                title: 'Ошибка!',
-                text: 'Неверный пароль. Пожалуйста, проверьте правильность введенного пароля.',
-                icon: 'error',
-                background: '#1c1c1e',
-                color: '#ffffff',
-                confirmButtonColor: '#34c38f'
-            });
-        });
-    });
-});
-</script>
-
 @endsection

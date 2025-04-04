@@ -24,16 +24,25 @@
             @if(count($products) > 0)
                 @foreach($products as $product)
                     <div class="card catalog__item">
-                        <img src="{{ Vite::asset('resources/media/images/') . $product->img }}" alt="{{ $product->title }}" class="card-img-top">
+                        @if(file_exists(public_path('resources/media/images/' . $product->img)))
+                            <img src="{{ asset('resources/media/images/' . $product->img) }}" alt="{{ $product->title }}" class="card-img-top">
+                        
+                        @endif
                         <div class="card-body">
                             <h5 class="card-title">{{ $product->title }}</h5>
-                            <p class="card-text">{{ $product->price }} руб.</p>
+                            <p class="card-text">{{ number_format($product->price, 0, ',', ' ') }} руб.</p>
                             <div class="new-product__actions">
                                 <a href="/product/{{ $product->id }}" class="btn btn-outline-success">Подробнее</a>
                                 @auth
-                                    <button onclick="addToCart({{ $product->id }})" class="btn btn-success">
-                                        <i class="fas fa-shopping-cart"></i>
-                                    </button>
+                                    @if($product->qty > 0)
+                                        <button onclick="addToCart({{ $product->id }})" class="btn btn-success">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </button>
+                                    @else
+                                        <button class="btn btn-secondary" disabled>
+                                            <i class="fas fa-shopping-cart"></i> Нет в наличии
+                                        </button>
+                                    @endif
                                 @endauth
                             </div>
                         </div>
@@ -72,29 +81,44 @@
 
 <script>
 function addToCart(productId) {
-    fetch(`/add-to-cart/${productId}`)
-        .then(response => {
-            if (response.ok) {
-                const toast = new bootstrap.Toast(document.getElementById('successToast'), {
-                    autohide: true,
-                    delay: 3000
-                });
-                toast.show();
-            } else {
-                const toast = new bootstrap.Toast(document.getElementById('errorToast'), {
-                    autohide: true,
-                    delay: 3000
-                });
-                toast.show();
-            }
-        })
-        .catch(() => {
+    fetch(`/add-to-cart/${productId}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            document.querySelector('#errorToast .toast-body').textContent = data.error;
             const toast = new bootstrap.Toast(document.getElementById('errorToast'), {
                 autohide: true,
                 delay: 3000
             });
             toast.show();
+        } else {
+            const toast = new bootstrap.Toast(document.getElementById('successToast'), {
+                autohide: true,
+                delay: 3000
+            });
+            toast.show();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.querySelector('#errorToast .toast-body').textContent = 'Произошла ошибка при добавлении товара в корзину';
+        const toast = new bootstrap.Toast(document.getElementById('errorToast'), {
+            autohide: true,
+            delay: 3000
         });
+        toast.show();
+    });
 }
 </script>
 

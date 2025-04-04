@@ -2,26 +2,34 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Product;
+use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class CatalogController extends Controller
 {
     public function getProducts(Request $request)
     {
-        $products = DB::table('products')->where('qty', '>', 0)->get();
-        $categories = DB::table('categories')->get();
+        $query = Product::where('qty', '>', 0);
+        $categories = Category::all();
         $params = collect($request->query());
 
         if ($params->get('sort_by')) {
-            $products = $products->sortBy($params->get('sort_by'));
+            $query->orderBy($params->get('sort_by'));
         }
         if ($params->get('sort_by_desc')) {
-            $products = $products->sortByDesc($params->get('sort_by_desc'));
+            $query->orderByDesc($params->get('sort_by_desc'));
         }
         if ($params->get('filter')) {
-            $products = $products->where('product_type', $params->get('filter'));
+            $query->where('product_type', $params->get('filter'));
         }
-        return view('catalog', ['products' => $products, 'categories' => $categories, 'params' => $params]);
+
+        $products = $query->get();
+
+        return view('catalog', [
+            'products' => $products,
+            'categories' => $categories,
+            'params' => $params
+        ]);
     }
 }

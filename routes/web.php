@@ -49,8 +49,8 @@ Route::middleware(['auth', 'is-admin'])->group(function () {
 
     // Маршруты для заказов
     Route::get('/orders', [OrderController::class, 'getOrders'])->name('admin.orders');
-    Route::get('/order-status/{action}/{number}', [OrderController::class, 'editOrderStatus']);
-    Route::patch('/order-status/{action}/{number}', [OrderController::class, 'editOrderStatus']);
+    Route::post('/orders/{action}/{number}', [OrderController::class, 'editOrderStatus'])->name('admin.orders.edit');
+    Route::delete('/orders/{number}', [OrderController::class, 'deleteOrder'])->name('admin.orders.delete');
 });
 
 // Маршруты для пользователей
@@ -66,12 +66,14 @@ Route::middleware('auth')->group(function () {
     // Корзина
     Route::get('/add-to-cart/{id}', [CartController::class, 'addToCart']);
     Route::get('/cart', [CartController::class, 'index'])->name('cart');
-    Route::get('/changeqty/{param}/{id}', [CartController::class, 'changeQty'])->name('changeQty');
+    Route::get('/changeqty/{param}/{id}', [CartController::class, 'changeQty'])->name('changeqty');
     
     // Заказы
     Route::get('/create-order', [OrderController::class, 'index'])->name('create-order');
-    Route::post('/create-order', [OrderController::class, 'createOrder']);
-    Route::delete('/order-delete/{number}', [OrderController::class, 'deleteOrder'])->name('order.delete');
+    Route::post('/create-order', [OrderController::class, 'store'])->name('order.store');
+    Route::get('/orders', [OrderController::class, 'getOrders'])->name('admin.orders');
+    Route::post('/orders/{action}/{number}', [OrderController::class, 'editOrderStatus'])->name('admin.orders.edit');
+    Route::delete('/orders/{number}', [OrderController::class, 'deleteOrder'])->name('admin.orders.delete');
 });
 
 // Аутентификация

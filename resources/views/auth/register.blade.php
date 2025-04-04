@@ -1,72 +1,90 @@
-<x-guest-layout>
-    <head>
-        <meta charset="UTF-8">
-    </head>
-    <form method="POST" action="{{ route('register') }}" class="form-container">
-        @csrf
+@extends('layouts.app')
+@section('content')
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">{{ __('messages.auth.register') }}</div>
 
-        <!-- Name -->
-        <div class="form-group">
-            <x-input-label for="name" :value="__('Имя')" />
-            <x-text-input id="name" class="form-input" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="error-message" />
-        </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ route('register') }}">
+                            @csrf
 
-        <!-- Surname -->
-        <div class="form-group">
-            <x-input-label for="surname" :value="__('Фамилия')" />
-            <x-text-input id="surname" class="form-input" type="text" name="surname" :value="old('surname')" required autocomplete="surname" />
-            <x-input-error :messages="$errors->get('surname')" class="error-message" />
-        </div>
+                            <div class="row mb-3">
+                                <label for="name" class="col-md-4 col-form-label text-md-end">{{ __('messages.auth.name') }}</label>
 
-        <!-- Patronymic -->
-        <div class="form-group">
-            <x-input-label for="patronymic" :value="__('Отчество')" />
-            <x-text-input id="patronymic" class="form-input" type="text" name="patronymic" :value="old('patronymic')" required autocomplete="patronymic" />
-            <x-input-error :messages="$errors->get('patronymic')" class="error-message" />
-        </div>
+                                <div class="col-md-6">
+                                    <input id="name" type="text" class="form-control @error('name') is-invalid @enderror" name="name" value="{{ old('name') }}" required autocomplete="name" autofocus>
 
-        <!-- Login -->
-        <div class="form-group">
-            <x-input-label for="login" :value="__('Логин')" />
-            <x-text-input id="login" class="form-input" type="text" name="login" :value="old('login')" required autocomplete="login" />
-            <x-input-error :messages="$errors->get('login')" class="error-message" />
-        </div>
+                                    @error('name')
+                                        <span class="invalid-feedback" role="alert">
+                                            <strong>{{ $message }}</strong>
+                                        </span>
+                                    @enderror
+                                </div>
+                            </div>
 
-        <!-- Email -->
-        <div class="form-group">
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="form-input" type="email" name="email" :value="old('email')" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="error-message" />
-        </div>
+                            <div class="row mb-3">
+                                <label for="email" class="col-md-4 col-form-label text-md-end">{{ __('messages.auth.email') }}</label>
 
-        <!-- Password -->
-        <div class="form-group">
-            <x-input-label for="password" :value="__('Пароль')" />
-            <x-text-input id="password" class="form-input" type="password" name="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="error-message" />
-        </div>
+                                <div class="col-md-6">
+                                    <input id="email" type="email" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email">
 
-        <!-- Confirm Password -->
-        <div class="form-group">
-            <x-input-label for="password_confirmation" :value="__('Подтвердите пароль')" />
-            <x-text-input id="password_confirmation" class="form-input" type="password" name="password_confirmation" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password_confirmation')" class="error-message" />
-        </div>
+                                    @error('email')
+                                        <span class="invalid-feedback" role="alert">
+                                            <strong>{{ $message }}</strong>
+                                        </span>
+                                    @enderror
+                                </div>
+                            </div>
 
-        <!-- Rules Confirmation -->
-        <div class="form-group checkbox-group">
-            <x-text-input id="rules_confirmation" class="form-checkbox" type="checkbox" name="rules_confirmation" required />
-            <x-input-label for="rules_confirmation" :value="__('Согласие с правилами регистрации')" class="checkbox-label" />
-        </div>
+                            <div class="row mb-3">
+                                <label for="phone" class="col-md-4 col-form-label text-md-end">{{ __('messages.auth.phone') }}</label>
 
-        <div class="form-footer">
-            <a class="form-link" href="{{ route('login') }}">
-                {{ __('Уже зарегистрированы?') }}
-            </a>
-            <x-primary-button class="form-button">
-                {{ __('Зарегистрироваться') }}
-            </x-primary-button>
+                                <div class="col-md-6">
+                                    <input id="phone" type="tel" class="form-control @error('phone') is-invalid @enderror" name="phone" value="{{ old('phone') }}" required autocomplete="tel">
+
+                                    @error('phone')
+                                        <span class="invalid-feedback" role="alert">
+                                            <strong>{{ $message }}</strong>
+                                        </span>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label for="password" class="col-md-4 col-form-label text-md-end">{{ __('messages.auth.password') }}</label>
+
+                                <div class="col-md-6">
+                                    <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required autocomplete="new-password">
+
+                                    @error('password')
+                                        <span class="invalid-feedback" role="alert">
+                                            <strong>{{ $message }}</strong>
+                                        </span>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label for="password-confirm" class="col-md-4 col-form-label text-md-end">{{ __('messages.auth.confirm_password') }}</label>
+
+                                <div class="col-md-6">
+                                    <input id="password-confirm" type="password" class="form-control" name="password_confirmation" required autocomplete="new-password">
+                                </div>
+                            </div>
+
+                            <div class="row mb-0">
+                                <div class="col-md-6 offset-md-4">
+                                    <button type="submit" class="btn btn-primary">
+                                        {{ __('messages.auth.register') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
-    </form>
-</x-guest-layout>
+    </div>
+@endsection

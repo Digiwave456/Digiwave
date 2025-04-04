@@ -2,80 +2,94 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
+use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $cartTable = DB::table('cart')->where('uid', $request->user()->id)->get();
-        $goodCart = [];
+        $cart = Cart::where('uid', auth()->id())->get();
+        $error = null;
         $total = 0;
 
-        foreach ($cartTable as $cartItem) {
-            $product = DB::table('products')->select('title', 'price', 'qty')->where('id', $cartItem->pid)->first();
-            $total += $cartItem->qty * $product->price;
-
-            $goodCart[] = (object)[
-                'id' => $cartItem->id,
-                'title' => $product->title,
-                'price' => $product->price,
-                'qty' => $cartItem->qty,
-                'limit' => $product->qty,
-            ];
+        foreach ($cart as $item) {
+            $product = Product::find($item->pid);
+            if (!$product || $product->qty <= 0) {
+                $error = 'Товара нет в наличии';
+                break;
+            }
+            $total += $product->price * $item->qty;
         }
 
-        return view('createOrder', ['cart' => $goodCart, 'total' => $total]);
+        if ($error) {
+            return redirect()->route('cart')->with('error', $error);
+        }
+
+        return view('createOrder', compact('cart', 'total'));
     }
 
-    public function createOrder(Request $request)
+    public function store(Request $request)
     {
-        $request->validate([
-            'password' => 'required|string',
-        ]);
+        Log::info('Creating order', ['user_id' => auth()->id()]);
 
-        if (Hash::check($request->get('password'), $request->user()->password)) {
-            $orderNumber = $this->generateOrderNumber();
-            $userCartTable = DB::table('cart')->where('uid', $request->user()->id)->get();
+        try {
+            $cart = Cart::where('uid', auth()->id())->get();
+            
+            if ($cart->isEmpty()) {
+                Log::warning('Attempt to create order with empty cart', ['user_id' => auth()->id()]);
+                return redirect()->route('cart')->with('error', 'Корзина пуста');
+            }
 
-            DB::transaction(function () use ($userCartTable, $orderNumber, $request) {
-                foreach ($userCartTable as $cartItem) {
-                    DB::table('orders')->insert([
-                        'uid' => $cartItem->uid,
-                        'pid' => $cartItem->pid,
-                        'qty' => $cartItem->qty,
-                        'number' => $orderNumber,
-                        'created_at' => now(),
-                        'status' => 'Новый',
-                    ]);
+            foreach ($cart as $item) {
+                $product = Product::find($item->pid);
+                
+                if (!$product) {
+                    Log::error('Product not found', ['product_id' => $item->pid]);
+                    return redirect()->route('cart')->with('error', 'Товар не найден');
                 }
 
-                DB::table('cart')->where('uid', $request->user()->id)->delete();
-            });
+                if ($product->qty < $item->qty) {
+                    Log::error('Not enough stock', [
+                        'product_id' => $product->id,
+                        'requested_qty' => $item->qty,
+                        'available_qty' => $product->qty
+                    ]);
+                    return redirect()->route('cart')->with('error', 'Недостаточно товара в наличии');
+                }
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Заказ успешно сформирован! Номер вашего заказа: ' . $orderNumber,
-                'orderNumber' => $orderNumber
+                $order = Order::create([
+                    'uid' => auth()->id(),
+                    'pid' => $item->pid,
+                    'qty' => $item->qty,
+                    'number' => uniqid(),
+                    'status' => 'Новый'
+                ]);
+
+                Log::info('Order created', [
+                    'order_id' => $order->id,
+                    'product_id' => $item->pid,
+                    'quantity' => $item->qty
+                ]);
+
+                $product->decrement('qty', $item->qty);
+                $item->delete();
+            }
+
+            Log::info('Order process completed successfully', ['user_id' => auth()->id()]);
+            return redirect()->route('user')->with('success', 'Заказ успешно создан');
+        } catch (\Exception $e) {
+            Log::error('Error creating order', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-        } else {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Неверный пароль. Пожалуйста, проверьте правильность введенного пароля.'
-            ], 403);
+            return redirect()->route('cart')->with('error', 'Произошла ошибка при создании заказа');
         }
-    }
-
-    private function generateOrderNumber()
-    {
-        do {
-            $orderNumber = Str::random(8);
-        } while (DB::table('orders')->where('number', $orderNumber)->exists());
-
-        return $orderNumber;
     }
 
     public function getOrders(Request $request)

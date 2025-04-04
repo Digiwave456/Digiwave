@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Order;
+use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
 
@@ -18,9 +19,11 @@ class ProfileController extends Controller
     public function index(Request $request)
     {
         $goodOrders = [];
-        $ordersTable = DB::table('orders')->where('uid', $request->user()->id)->get()->groupBy(['number']);
+        $orders = Order::where('uid', $request->user()->id)
+            ->get()
+            ->groupBy('number');
 
-        foreach ($ordersTable as $order) {
+        foreach ($orders as $order) {
             $openedOrder = $order->all();
             $date = $openedOrder[0]->created_at;
             $orderNumber = $openedOrder[0]->number;
@@ -30,28 +33,27 @@ class ProfileController extends Controller
             $products = [];
 
             foreach ($openedOrder as $orderItem) {
-                $product = DB::table('products')->where('id', $orderItem->pid)->first();
+                $product = Product::find($orderItem->pid);
                 $totalPrice += $product->price * $orderItem->qty;
                 $totalQty += $orderItem->qty;
 
-                array_push($products,
-                    (object)[
-                        'title' => $product->title,
-                        'price' => $product->price,
-                        'qty' => $orderItem->qty,
-                    ]);
+                $products[] = (object)[
+                    'title' => $product->title,
+                    'price' => $product->price,
+                    'qty' => $orderItem->qty,
+                ];
             }
-            array_push($goodOrders,
-                (object)[
-                    'number' => $orderNumber,
-                    'products' => $products,
-                    'date' => $date,
-                    'totalPrice' => $totalPrice,
-                    'totalQty' => $totalQty,
-                    'status' => $orderStatus,
 
-                ]);
+            $goodOrders[] = (object)[
+                'number' => $orderNumber,
+                'products' => $products,
+                'date' => $date,
+                'totalPrice' => $totalPrice,
+                'totalQty' => $totalQty,
+                'status' => $orderStatus,
+            ];
         }
+
         return view('profile.index', ['orders' => $goodOrders]);
     }
 

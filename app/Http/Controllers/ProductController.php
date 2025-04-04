@@ -2,93 +2,80 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Models\Product;
+use App\Models\Category;
+use Illuminate\Http\Request;
 
-class
-ProductController extends Controller
+class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $id = $request->id;
-        $product = DB::table('products')
-            ->join(
-                'categories',
-                'categories.id', '=', 'products.product_type'
-            )->where('products.id', $id)->first();
-        if (!is_null($product)) {
-            $product->id = intval($id);
-            return view('product', ['product' => $product]);
-        } else {
+        $product = Product::with('category')
+            ->find($request->id);
+
+        if (!$product) {
             return view('404');
         }
+
+        return view('product', ['product' => $product]);
     }
 
     public function getProducts(Request $request)
     {
-        $products = DB::table('products')->join(
-            'categories',
-            'categories.id',
-            '=',
-            'products.product_type'
-        )->select('products.id as id',
-            'products.*',
-            'categories.product_type as product_type'
-        )->get();
+        $products = Product::with('category')
+            ->select('products.*', 'categories.product_type')
+            ->join('categories', 'categories.id', '=', 'products.product_type')
+            ->get();
+
         return view('admin.products', ['products' => $products]);
     }
 
     public function getProductById(Request $request)
     {
-        $id = $request->id;
-        $categories = DB::table('categories')->get();
-        $product = DB::table('products')->join(
-            'categories',
-            'categories.id',
-            '=',
-            'products.product_type'
-        )->select(
-            'products.id as id',
-            'products.*',
-            'categories.product_type as product_type'
-        )->where('products.id', $id)->first();
+        $product = Product::with('category')
+            ->select('products.*', 'categories.product_type')
+            ->join('categories', 'categories.id', '=', 'products.product_type')
+            ->find($request->id);
 
-        if (!is_null($product)) {
-            return view('admin.product-edit', ['categories' => $categories, 'product' => $product]);
-        } else {
+        if (!$product) {
             return abort(404);
         }
-    }
 
+        $categories = Category::all();
+        return view('admin.product-edit', ['categories' => $categories, 'product' => $product]);
+    }
 
     public function editProduct(Request $request, $id)
     {
         $product = Product::find($id);
         
-        $product->title = $request->input('title');
-        $product->price = $request->input('price');
-        $product->description = $request->input('description');
-        $product->qty = $request->input('qty');
-        $product->color = $request->input('color');
-        $product->img = $request->input('img');
-        $product->country = $request->input('country');
-        $product->product_type = $request->input('category');
-        
-        $product->save();
+        if (!$product) {
+            return redirect('/products');
+        }
+
+        $product->update([
+            'title' => $request->input('title'),
+            'price' => $request->input('price'),
+            'description' => $request->input('description'),
+            'qty' => $request->input('qty'),
+            'color' => $request->input('color'),
+            'img' => $request->input('img'),
+            'country' => $request->input('country'),
+            'product_type' => $request->input('category'),
+        ]);
         
         return redirect('/products');
     }
 
     public function createProductView()
     {
-        $categories = DB::table('categories')->get();
+        $categories = Category::all();
         return view('admin.product-create', ['categories' => $categories]);
     }
 
     public function createProduct(Request $request)
     {
-        DB::table('products')->insert([
+        Product::create([
             'title' => $request->input('title'),
             'qty' => $request->input('qty'),
             'price' => $request->input('price'),
@@ -96,15 +83,19 @@ ProductController extends Controller
             'img' => $request->input('img'),
             'country' => $request->input('country'),
             'color' => $request->input('color'),
-            'created_at' => DB::raw('CURRENT_TIMESTAMP')
         ]);
-        return redirect()->route('admin.products');
-    }
-    public function deleteProduct(Request $request)
-    {
-        $product = DB::table('products')->where('id', $request->id);
-        $product->delete();
+
         return redirect()->route('admin.products');
     }
 
+    public function deleteProduct(Request $request)
+    {
+        $product = Product::find($request->id);
+        
+        if ($product) {
+            $product->delete();
+        }
+
+        return redirect()->route('admin.products');
+    }
 }

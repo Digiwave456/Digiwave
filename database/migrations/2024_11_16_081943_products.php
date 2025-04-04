@@ -21,7 +21,7 @@ return new class extends Migration
       
             $table->integer('price');
             
-            // Path to product image
+           
             $table->string('img');
             
 
