@@ -9,28 +9,53 @@ use Illuminate\Support\Facades\Log;
 
 class CartController extends Controller
 {
-    // Изменение количества товара в корзине
+  
     public function changeQty(Request $request, $param, $id)
     {
+        // Преобразуем ID в целое число
+        $cartId = (int)$id;
+        $userLogin = auth()->user()->login;
+        
         Log::info('Changing cart item quantity', [
             'param' => $param,
-            'id' => $id,
-            'user_id' => auth()->id()
+            'id' => $cartId,
+            'user_login' => $userLogin
         ]);
 
+        // Validate parameter at the beginning
+        if ($param !== 'incr' && $param !== 'decr') {
+            Log::error('Invalid parameter', ['param' => $param]);
+            return response()->json(['error' => 'Неверный параметр'], 400);
+        }
+
         try {
-            $cartItem = Cart::where('uid', auth()->id())
-                ->where('id', $id)
+            Log::info('Looking for cart item', [
+                'id' => $cartId,
+                'user_login' => $userLogin
+            ]);
+            
+            $cartItem = Cart::where('uid', $userLogin)
+                ->where('id', $cartId)
                 ->first();
 
             if (!$cartItem) {
                 Log::error('Cart item not found', [
-                    'id' => $id,
-                    'user_id' => auth()->id()
+                    'id' => $cartId,
+                    'user_login' => $userLogin
                 ]);
                 return response()->json(['error' => 'Товар в корзине не найден'], 404);
             }
+            
+            Log::info('Cart item found', [
+                'cart_id' => $cartItem->id,
+                'product_id' => $cartItem->pid,
+                'qty' => $cartItem->qty
+            ]);
 
+            Log::info('Looking for product', [
+                'product_id' => $cartItem->pid
+            ]);
+            
             $product = Product::find($cartItem->pid);
 
             if (!$product) {
@@ -40,17 +65,23 @@ class CartController extends Controller
                 $cartItem->delete();
                 return response()->json(['error' => 'Товар больше не доступен', 'reload' => true], 404);
             }
+            
+            Log::info('Product found', [
+                'product_id' => $product->id,
+                'product_title' => $product->title,
+                'qty' => $product->qty
+            ]);
 
-            if ($product->qty <= 0) {
-                Log::error('Product out of stock', [
-                    'product_id' => $product->id,
-                    'qty' => $product->qty
-                ]);
-                $cartItem->delete();
-                return response()->json(['error' => 'Товара нет в наличии', 'reload' => true], 400);
-            }
+            // Проверка наличия товара теперь обрабатывается через наблюдатель
+            // Если товара нет в наличии, он уже должен быть удален из корзины
 
             if ($param === 'incr') {
+                Log::info('Attempting to increase quantity', [
+                    'cart_id' => $cartItem->id,
+                    'current_qty' => $cartItem->qty,
+                    'product_qty' => $product->qty
+                ]);
+                
                 if ($cartItem->qty < $product->qty) {
                     $cartItem->update(['qty' => $cartItem->qty + 1]);
                     Log::info('Quantity increased', [
@@ -68,6 +99,11 @@ class CartController extends Controller
             }
 
             if ($param === 'decr') {
+                Log::info('Attempting to decrease quantity', [
+                    'cart_id' => $cartItem->id,
+                    'current_qty' => $cartItem->qty
+                ]);
+                
                 if ($cartItem->qty > 1) {
                     $cartItem->update(['qty' => $cartItem->qty - 1]);
                     Log::info('Quantity decreased', [
@@ -82,63 +118,51 @@ class CartController extends Controller
                 }
                 return response()->json(['success' => true]);
             }
-
-            Log::error('Invalid parameter', ['param' => $param]);
-            return response()->json(['error' => 'Неверный параметр'], 400);
         } catch (\Exception $e) {
             Log::error('Error changing cart item quantity', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'param' => $param,
+                'id' => $cartId,
+                'user_login' => $userLogin
             ]);
-            return response()->json(['error' => 'Произошла ошибка при изменении количества'], 500);
+            return response()->json(['error' => 'Произошла ошибка при изменении количества: ' . $e->getMessage()], 500);
         }
     }
 
-    // Отображение корзины
+   
     public function index(Request $request)
     {
+        // Получаем записи корзины с загруженными продуктами
         $cartItems = Cart::with('product')
-            ->where('uid', $request->user()->id)
+            ->where('uid', $request->user()->login)
             ->get();
 
-        // Проверяем наличие всех товаров и удаляем недоступные
-        foreach ($cartItems as $cartItem) {
-            if (!$cartItem->product || $cartItem->product->qty <= 0) {
+        // Фильтруем записи, удаляя те, у которых нет продукта
+        $cartItems = $cartItems->filter(function ($cartItem) {
+            if (!$cartItem->product) {
                 $cartItem->delete();
-            } elseif ($cartItem->qty > $cartItem->product->qty) {
-                $cartItem->update(['qty' => $cartItem->product->qty]);
+                return false;
             }
-        }
-
-        // Получаем обновленный список товаров
-        $cartItems = Cart::with('product')
-            ->where('uid', $request->user()->id)
-            ->get();
-
-        $goodCart = $cartItems->map(function ($cartItem) {
-            return (object)[
-                'id' => $cartItem->id,
-                'title' => $cartItem->product->title ?? 'Неизвестный товар',
-                'price' => $cartItem->product->price ?? 0,
-                'qty' => $cartItem->qty,
-                'limit' => $cartItem->product->qty ?? 0,
-                'img' => $cartItem->product->img ?? '',
-            ];
+            return true;
         });
 
-        return view('cart', ['cart' => $goodCart]);
+        return view('cart', ['cart' => $cartItems]);
     }
 
-    // Добавление товара в корзину
+ 
     public function addToCart(Request $request)
     {
         try {
+            $productId = (int)$request->id;
+            $userLogin = $request->user()->login;
+            
             \Log::info('Adding to cart', [
-                'product_id' => $request->id,
-                'user_id' => $request->user()->id
+                'product_id' => $productId,
+                'user_login' => $userLogin
             ]);
 
-            $product = Product::find($request->id);
+            $product = Product::find($productId);
 
             \Log::info('Product found', [
                 'product' => $product ? [
@@ -149,22 +173,16 @@ class CartController extends Controller
             ]);
 
             if (!$product) {
-                \Log::error('Product not found', ['product_id' => $request->id]);
+                \Log::error('Product not found', ['product_id' => $productId]);
                 return response()->json(['error' => 'Товар не найден'], 404);
             }
 
-            // Проверяем наличие товара
-            if ($product->qty <= 0) {
-                \Log::error('Product out of stock', [
-                    'product_id' => $product->id,
-                    'qty' => $product->qty
-                ]);
-                return response()->json(['error' => 'Товара нет в наличии'], 400);
-            }
+            // Проверка наличия товара теперь обрабатывается через наблюдатель
+            // Если товара нет в наличии, наблюдатель автоматически удалит его из корзины
 
             // Проверяем, есть ли товар уже в корзине
-            $itemInCart = Cart::where('uid', $request->user()->id)
-                ->where('pid', $request->id)
+            $itemInCart = Cart::where('uid', $userLogin)
+                ->where('pid', $productId)
                 ->first();
 
             \Log::info('Item in cart', [
@@ -175,8 +193,8 @@ class CartController extends Controller
             if (!$itemInCart) {
                 // Создаем новую запись в корзине
                 Cart::create([
-                    'uid' => $request->user()->id,
-                    'pid' => $request->id,
+                    'uid' => $userLogin,
+                    'pid' => $productId,
                     'qty' => 1,
                 ]);
                 \Log::info('New cart item created');

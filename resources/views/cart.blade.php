@@ -11,25 +11,25 @@
             <table class="cart__table">
                 <tbody>
                     @foreach($cart as $item)
-                    <tr class="cart__raw">
+                    <tr class="cart__raw" data-cart-id="{{ $item->id }}">
                         <td>
-                            @if(file_exists(public_path('resources/media/images/' . $item->img)))
-                                <img src="{{ asset('resources/media/images/' . $item->img) }}" alt="{{ $item->title }}" class="card-img-top">
+                            @if(file_exists(public_path('resources/media/images/' . $item->product->img)))
+                                <img src="{{ asset('resources/media/images/' . $item->product->img) }}" alt="{{ $item->product->title }}" class="card-img-top">
                             @else
                                 <img src="{{ asset('resources/media/images/no-image.jpg') }}" alt="{{ __('messages.product.not_found') }}" class="card-img-top">
                             @endif
                         </td>
                         
                         <td class="cart__qty">
-                        {{$item->title}}
+                        {{$item->product->title}}
                         <span class="cart__qty1">
-                            <button class="btn {{ $item->qty == $item->limit ? 'disabled' : '' }}" id="increase" cartid="{{ $item->id }}">+</button>
-                            <span class="cart__qty-value">{{ $item->qty }}</span>
-                            <button class="btn" id="decrease" cartid="{{ $item->id }}">-</button>
+                            <button class="btn increase-btn {{ $item->qty == $item->product->qty ? 'disabled' : '' }}" data-cart-id="{{ $item->id }}">+</button>
+                            <span class="cart__qty-value" data-cart-id="{{ $item->id }}">{{ $item->qty }}</span>
+                            <button class="btn decrease-btn" data-cart-id="{{ $item->id }}">-</button>
                         </span>
                         </td>
                         
-                        <td>{{ number_format($item->price * $item->qty, 0, ',', ' ') }} ₽</td>
+                        <td class="cart__price" data-cart-id="{{ $item->id }}">{{ number_format($item->product->price * $item->qty, 0, ',', ' ') }} ₽</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -71,90 +71,106 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Initializing cart quantity change handlers...');
             
-            const cartRaws = document.querySelectorAll('.cart__raw');
-            console.log('Found cart rows:', cartRaws.length);
-            
             const successToast = new bootstrap.Toast(document.getElementById('successToast'));
             const errorToast = new bootstrap.Toast(document.getElementById('errorToast'));
 
-            cartRaws.forEach((raw, index) => {
-                console.log(`Processing cart row ${index + 1}`);
+            // Функция для обновления цены товара
+            function updatePrice(cartId, qty) {
+                const priceElement = document.querySelector(`.cart__price[data-cart-id="${cartId}"]`);
+                const qtyElement = document.querySelector(`.cart__qty-value[data-cart-id="${cartId}"]`);
                 
-                const increase = raw.querySelector('#increase');
-                const decrease = raw.querySelector('#decrease');
-                const qtyValue = raw.querySelector('.cart__qty-value');
-                const cartId = Number(increase.attributes.cartid.value);
-                
-                console.log(`Cart item ID: ${cartId}`);
+                if (priceElement && qtyElement) {
+                    qtyElement.textContent = qty;
+                    
+                    // Получаем цену за единицу из текущей общей цены и текущего количества
+                    const currentTotal = parseFloat(priceElement.textContent.replace(/[^\d]/g, ''));
+                    const currentQty = parseInt(qtyElement.textContent);
+                    const unitPrice = currentTotal / currentQty;
+                    
+                    // Вычисляем новую общую цену
+                    const newTotal = unitPrice * qty;
+                    priceElement.textContent = new Intl.NumberFormat('ru-RU').format(newTotal) + ' ₽';
+                }
+            }
 
-                increase.addEventListener('click', () => {
-                    console.log(`Increasing quantity for cart item ${cartId}`);
-                    fetch(`/changeqty/incr/${cartId}`, {
-                        method: 'GET',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            // Функция для обработки изменения количества
+            function handleQuantityChange(action, cartId) {
+                console.log(`${action}ing quantity for cart item ${cartId}`);
+                
+                fetch(`/changeqty/${action}/${cartId}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.error) {
+                        document.querySelector('#errorToast .toast-body').textContent = data.error;
+                        errorToast.show();
+                        if (data.reload) {
+                            setTimeout(() => window.location.reload(), 2000);
                         }
-                    })
-                    .then(response => {
-                        console.log('Response status:', response.status);
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Response data:', data);
-                        if (data.error) {
-                            document.querySelector('#errorToast .toast-body').textContent = data.error;
-                            errorToast.show();
-                            if (data.reload) {
-                                setTimeout(() => window.location.reload(), 2000);
+                    } else {
+                        // Если это уменьшение количества и количество стало 0, удаляем строку
+                        if (action === 'decr') {
+                            const qtyElement = document.querySelector(`.cart__qty-value[data-cart-id="${cartId}"]`);
+                            if (qtyElement && parseInt(qtyElement.textContent) <= 1) {
+                                const row = document.querySelector(`.cart__raw[data-cart-id="${cartId}"]`);
+                                if (row) {
+                                    row.remove();
+                                    // Если это была последняя строка, показываем сообщение о пустой корзине
+                                    if (document.querySelectorAll('.cart__raw').length === 0) {
+                                        document.querySelector('.cart__table').remove();
+                                        document.querySelector('.cart__actions').remove();
+                                        const emptyMessage = document.createElement('h3');
+                                        emptyMessage.className = 'cart__table--empty';
+                                        emptyMessage.textContent = '{{ __("messages.cart.empty") }}';
+                                        document.querySelector('.cart.container').appendChild(emptyMessage);
+                                    }
+                                }
+                            } else {
+                                updatePrice(cartId, parseInt(qtyElement.textContent) - 1);
                             }
                         } else {
-                            window.location.reload();
+                            // Для увеличения просто обновляем количество и цену
+                            const qtyElement = document.querySelector(`.cart__qty-value[data-cart-id="${cartId}"]`);
+                            if (qtyElement) {
+                                updatePrice(cartId, parseInt(qtyElement.textContent) + 1);
+                            }
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        document.querySelector('#errorToast .toast-body').textContent = '{{ __("messages.cart.quantity_error") }}';
-                        errorToast.show();
-                    });
+                        
+                        successToast.show();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.querySelector('#errorToast .toast-body').textContent = '{{ __("messages.cart.quantity_error") }}';
+                    errorToast.show();
                 });
+            }
 
-                decrease.addEventListener('click', () => {
-                    console.log(`Decreasing quantity for cart item ${cartId}`);
-                    fetch(`/changeqty/decr/${cartId}`, {
-                        method: 'GET',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                        }
-                    })
-                    .then(response => {
-                        console.log('Response status:', response.status);
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Response data:', data);
-                        if (data.error) {
-                            document.querySelector('#errorToast .toast-body').textContent = data.error;
-                            errorToast.show();
-                            if (data.reload) {
-                                setTimeout(() => window.location.reload(), 2000);
-                            }
-                        } else {
-                            window.location.reload();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        document.querySelector('#errorToast .toast-body').textContent = '{{ __("messages.cart.quantity_error") }}';
-                        errorToast.show();
-                    });
+            // Обработчики для кнопок увеличения количества
+            document.querySelectorAll('.increase-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    if (!button.classList.contains('disabled')) {
+                        handleQuantityChange('incr', button.dataset.cartId);
+                    }
+                });
+            });
+
+            // Обработчики для кнопок уменьшения количества
+            document.querySelectorAll('.decrease-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    handleQuantityChange('decr', button.dataset.cartId);
                 });
             });
         });
@@ -209,6 +225,38 @@
         /* Убираем паддинги у контейнера */
         .position-fixed {
             padding: 0;
+        }
+
+        /* Стили для кнопок */
+        .increase-btn,
+        .decrease-btn {
+            min-width: 30px;
+            height: 30px;
+            padding: 0;
+            line-height: 30px;
+            text-align: center;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            transition: all 0.2s ease;
+        }
+
+        .increase-btn:hover:not(.disabled),
+        .decrease-btn:hover {
+            background-color: #e9ecef;
+            border-color: #ced4da;
+        }
+
+        .increase-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .cart__qty-value {
+            display: inline-block;
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
         }
     </style>
 @endsection

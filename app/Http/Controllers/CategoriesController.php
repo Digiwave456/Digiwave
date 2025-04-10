@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Cart;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CategoriesController extends Controller
 {
@@ -29,22 +30,32 @@ class CategoriesController extends Controller
     }
     public function deleteCategory(Request $request)
     {
-        $category = Category::find($request->id);
-        
-        if ($category) {
-            // Delete related products and their cart/order items
-            $products = Product::where('product_type', $category->id)->get();
+        try {
+            $category = Category::find($request->id);
             
-            foreach ($products as $product) {
-                Cart::where('pid', $product->id)->delete();
-                Order::where('pid', $product->id)->delete();
-                $product->delete();
+            if ($category) {
+                Log::info('Deleting category and related records', [
+                    'category_id' => $category->id,
+                    'category_name' => $category->product_type
+                ]);
+                
+                $category->deleteWithRelations();
+                
+                Log::info('Category and related records deleted successfully', [
+                    'category_id' => $category->id
+                ]);
             }
-            
-            $category->delete();
-        }
 
-        return redirect()->route('admin.categories');
+            return redirect()->route('admin.categories');
+        } catch (\Exception $e) {
+            Log::error('Error deleting category', [
+                'category_id' => $request->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return redirect()->route('admin.categories')
+                ->with('error', 'Произошла ошибка при удалении категории');
+        }
     }
     public function editCategoryById(Request $request)
     {

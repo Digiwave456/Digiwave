@@ -15,20 +15,21 @@ class OrderController extends Controller
     public function index()
     {
         $cart = Cart::where('uid', auth()->id())->get();
-        $error = null;
         $total = 0;
+
+        // Проверяем, пуста ли корзина
+        if ($cart->isEmpty()) {
+            return redirect()->route('cart')->with('error', 'Корзина пуста. Добавьте товары в корзину перед оформлением заказа.');
+        }
+
+        // Проверки наличия товаров теперь обрабатываются через наблюдатель
+        // Наблюдатель автоматически удаляет недоступные товары из корзины
 
         foreach ($cart as $item) {
             $product = Product::find($item->pid);
-            if (!$product || $product->qty <= 0) {
-                $error = 'Товара нет в наличии';
-                break;
+            if ($product) {
+                $total += $product->price * $item->qty;
             }
-            $total += $product->price * $item->qty;
-        }
-
-        if ($error) {
-            return redirect()->route('cart')->with('error', $error);
         }
 
         return view('createOrder', compact('cart', 'total'));
@@ -43,25 +44,30 @@ class OrderController extends Controller
             
             if ($cart->isEmpty()) {
                 Log::warning('Attempt to create order with empty cart', ['user_id' => auth()->id()]);
-                return redirect()->route('cart')->with('error', 'Корзина пуста');
+                return redirect()->route('cart')->with('error', 'Корзина пуста. Добавьте товары в корзину перед оформлением заказа.');
+            }
+
+            // Проверяем, все ли товары в корзине существуют
+            $missingProducts = [];
+            foreach ($cart as $item) {
+                $product = Product::find($item->pid);
+                if (!$product) {
+                    $missingProducts[] = $item->id;
+                    Log::error('Product not found', ['product_id' => $item->pid]);
+                }
+            }
+            
+            if (!empty($missingProducts)) {
+                // Удаляем несуществующие товары из корзины
+                Cart::whereIn('id', $missingProducts)->delete();
+                return redirect()->route('cart')->with('error', 'Некоторые товары в корзине больше не доступны. Они были удалены из корзины.');
             }
 
             foreach ($cart as $item) {
                 $product = Product::find($item->pid);
                 
-                if (!$product) {
-                    Log::error('Product not found', ['product_id' => $item->pid]);
-                    return redirect()->route('cart')->with('error', 'Товар не найден');
-                }
-
-                if ($product->qty < $item->qty) {
-                    Log::error('Not enough stock', [
-                        'product_id' => $product->id,
-                        'requested_qty' => $item->qty,
-                        'available_qty' => $product->qty
-                    ]);
-                    return redirect()->route('cart')->with('error', 'Недостаточно товара в наличии');
-                }
+                // Проверка наличия товара теперь обрабатывается через наблюдатель
+                // Если товара нет в наличии, наблюдатель автоматически удалит его из корзины
 
                 $order = Order::create([
                     'uid' => auth()->id(),
@@ -88,7 +94,7 @@ class OrderController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return redirect()->route('cart')->with('error', 'Произошла ошибка при создании заказа');
+            return redirect()->route('cart')->with('error', 'Произошла ошибка при создании заказа: ' . $e->getMessage());
         }
     }
 
