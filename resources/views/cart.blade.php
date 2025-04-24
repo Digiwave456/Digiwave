@@ -66,11 +66,15 @@
         </div>
     </div>
 
+    @if(count($cart) > 0)
+        @push('meta')
+            <meta name="csrf-token" content="{{ csrf_token() }}">
+        @endpush
+    @endif
+
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Initializing cart quantity change handlers...');
-            
             const successToast = new bootstrap.Toast(document.getElementById('successToast'));
             const errorToast = new bootstrap.Toast(document.getElementById('errorToast'));
 
@@ -82,12 +86,12 @@
                 if (priceElement && qtyElement) {
                     qtyElement.textContent = qty;
                     
-                    // Получаем цену за единицу из текущей общей цены и текущего количества
+                    // Получаем текущую цену и количество
                     const currentTotal = parseFloat(priceElement.textContent.replace(/[^\d]/g, ''));
                     const currentQty = parseInt(qtyElement.textContent);
                     const unitPrice = currentTotal / currentQty;
                     
-                    // Вычисляем новую общую цену
+                    // Вычисляем новую цену
                     const newTotal = unitPrice * qty;
                     priceElement.textContent = new Intl.NumberFormat('ru-RU').format(newTotal) + ' ₽';
                 }
@@ -95,8 +99,6 @@
 
             // Функция для обработки изменения количества
             function handleQuantityChange(action, cartId) {
-                console.log(`${action}ing quantity for cart item ${cartId}`);
-                
                 fetch(`/changeqty/${action}/${cartId}`, {
                     method: 'GET',
                     headers: {
@@ -105,14 +107,12 @@
                     }
                 })
                 .then(response => {
-                    console.log('Response status:', response.status);
                     if (!response.ok) {
                         throw new Error('Network response was not ok');
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Response data:', data);
                     if (data.error) {
                         document.querySelector('#errorToast .toast-body').textContent = data.error;
                         errorToast.show();
@@ -120,14 +120,14 @@
                             setTimeout(() => window.location.reload(), 2000);
                         }
                     } else {
-                        // Если это уменьшение количества и количество стало 0, удаляем строку
+                        // Обновляем количество и цену
                         if (action === 'decr') {
                             const qtyElement = document.querySelector(`.cart__qty-value[data-cart-id="${cartId}"]`);
                             if (qtyElement && parseInt(qtyElement.textContent) <= 1) {
                                 const row = document.querySelector(`.cart__raw[data-cart-id="${cartId}"]`);
                                 if (row) {
                                     row.remove();
-                                    // Если это была последняя строка, показываем сообщение о пустой корзине
+                                    
                                     if (document.querySelectorAll('.cart__raw').length === 0) {
                                         document.querySelector('.cart__table').remove();
                                         document.querySelector('.cart__actions').remove();
@@ -141,7 +141,7 @@
                                 updatePrice(cartId, parseInt(qtyElement.textContent) - 1);
                             }
                         } else {
-                            // Для увеличения просто обновляем количество и цену
+                            // Увеличиваем количество
                             const qtyElement = document.querySelector(`.cart__qty-value[data-cart-id="${cartId}"]`);
                             if (qtyElement) {
                                 updatePrice(cartId, parseInt(qtyElement.textContent) + 1);
@@ -152,7 +152,6 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
                     document.querySelector('#errorToast .toast-body').textContent = '{{ __("messages.cart.quantity_error") }}';
                     errorToast.show();
                 });

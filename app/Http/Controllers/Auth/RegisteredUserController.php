@@ -38,6 +38,18 @@ class RegisteredUserController extends Controller
             'surname' => ['required', 'string', 'max:255'],
             'login' => 'required|string|regex:/^[a-zA-Z0-9_.]*$/|min:6|max:32',
             'patronymic' => 'string|max:32',
+        ], [
+            'name.required' => __('messages.auth.name') . ' ' . __('messages.error'),
+            'email.required' => __('messages.auth.email') . ' ' . __('messages.error'),
+            'email.email' => __('messages.auth.email') . ' ' . __('messages.error'),
+            'email.unique' => __('messages.auth.email') . ' ' . __('messages.error'),
+            'password.required' => __('messages.auth.password') . ' ' . __('messages.error'),
+            'password.confirmed' => __('messages.auth.confirm_password') . ' ' . __('messages.error'),
+            'surname.required' => __('messages.auth.surname') . ' ' . __('messages.error'),
+            'login.required' => __('messages.auth.login') . ' ' . __('messages.error'),
+            'login.regex' => __('messages.auth.login') . ' ' . __('messages.error'),
+            'login.min' => __('messages.auth.login') . ' ' . __('messages.error'),
+            'login.max' => __('messages.auth.login') . ' ' . __('messages.error'),
         ]);
 
         $user = User::create([
@@ -53,6 +65,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(RouteServiceProvider::HOME);
+        return redirect(RouteServiceProvider::HOME)->with('success', __('messages.success'));
     }
 }

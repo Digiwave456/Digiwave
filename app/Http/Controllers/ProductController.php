@@ -14,7 +14,7 @@ class ProductController extends Controller
             ->find($request->id);
 
         if (!$product) {
-            return view('404');
+            return abort(404, __('messages.product.not_found'));
         }
 
         return view('product', ['product' => $product]);
@@ -38,7 +38,7 @@ class ProductController extends Controller
             ->find($request->id);
 
         if (!$product) {
-            return abort(404);
+            return abort(404, __('messages.product.not_found'));
         }
 
         $categories = Category::all();
@@ -50,7 +50,7 @@ class ProductController extends Controller
         $product = Product::find($id);
         
         if (!$product) {
-            return redirect('/products');
+            return redirect('/products')->with('error', __('messages.product.not_found'));
         }
 
         $product->update([
@@ -64,7 +64,7 @@ class ProductController extends Controller
             'product_type' => $request->input('category'),
         ]);
         
-        return redirect('/products');
+        return redirect('/products')->with('success', __('messages.success'));
     }
 
     public function createProductView()
@@ -85,7 +85,7 @@ class ProductController extends Controller
             'color' => $request->input('color'),
         ]);
 
-        return redirect()->route('admin.products');
+        return redirect()->route('admin.products')->with('success', __('messages.success'));
     }
 
     public function deleteProduct(Request $request)
@@ -94,8 +94,9 @@ class ProductController extends Controller
         
         if ($product) {
             $product->delete();
+            return redirect()->route('admin.products')->with('success', __('messages.success'));
         }
 
-        return redirect()->route('admin.products');
+        return redirect()->route('admin.products')->with('error', __('messages.product.not_found'));
     }
 }

@@ -12,7 +12,7 @@ class CartController extends Controller
   
     public function changeQty(Request $request, $param, $id)
     {
-        // Преобразуем ID в целое число
+       
         $cartId = (int)$id;
         $userLogin = auth()->user()->login;
         
@@ -22,10 +22,10 @@ class CartController extends Controller
             'user_login' => $userLogin
         ]);
 
-        // Validate parameter at the beginning
+       
         if ($param !== 'incr' && $param !== 'decr') {
             Log::error('Invalid parameter', ['param' => $param]);
-            return response()->json(['error' => 'Неверный параметр'], 400);
+            return response()->json(['error' => __('messages.cart.quantity_error')], 400);
         }
 
         try {
@@ -43,7 +43,7 @@ class CartController extends Controller
                     'id' => $cartId,
                     'user_login' => $userLogin
                 ]);
-                return response()->json(['error' => 'Товар в корзине не найден'], 404);
+                return response()->json(['error' => __('messages.cart.item_not_found')], 404);
             }
             
             Log::info('Cart item found', [
@@ -63,7 +63,7 @@ class CartController extends Controller
                     'product_id' => $cartItem->pid
                 ]);
                 $cartItem->delete();
-                return response()->json(['error' => 'Товар больше не доступен', 'reload' => true], 404);
+                return response()->json(['error' => __('messages.product.not_found'), 'reload' => true], 404);
             }
             
             Log::info('Product found', [
@@ -72,8 +72,7 @@ class CartController extends Controller
                 'qty' => $product->qty
             ]);
 
-            // Проверка наличия товара теперь обрабатывается через наблюдатель
-            // Если товара нет в наличии, он уже должен быть удален из корзины
+          
 
             if ($param === 'incr') {
                 Log::info('Attempting to increase quantity', [
@@ -88,14 +87,14 @@ class CartController extends Controller
                         'cart_id' => $cartItem->id,
                         'new_qty' => $cartItem->qty
                     ]);
-                    return response()->json(['success' => true]);
+                    return response()->json(['success' => true, 'message' => __('messages.cart.quantity_updated')]);
                 }
                 Log::warning('Quantity limit reached', [
                     'cart_id' => $cartItem->id,
                     'current_qty' => $cartItem->qty,
                     'max_qty' => $product->qty
                 ]);
-                return response()->json(['error' => 'Достигнут лимит доступного количества товара'], 400);
+                return response()->json(['error' => __('messages.cart.quantity_limit')], 400);
             }
 
             if ($param === 'decr') {
@@ -110,13 +109,14 @@ class CartController extends Controller
                         'cart_id' => $cartItem->id,
                         'new_qty' => $cartItem->qty
                     ]);
+                    return response()->json(['success' => true, 'message' => __('messages.cart.quantity_updated')]);
                 } else {
                     $cartItem->delete();
                     Log::info('Cart item deleted', [
                         'cart_id' => $cartItem->id
                     ]);
+                    return response()->json(['success' => true, 'message' => __('messages.cart.quantity_updated')]);
                 }
-                return response()->json(['success' => true]);
             }
         } catch (\Exception $e) {
             Log::error('Error changing cart item quantity', [
@@ -126,19 +126,19 @@ class CartController extends Controller
                 'id' => $cartId,
                 'user_login' => $userLogin
             ]);
-            return response()->json(['error' => 'Произошла ошибка при изменении количества: ' . $e->getMessage()], 500);
+            return response()->json(['error' => __('messages.cart.quantity_error')], 500);
         }
     }
 
    
     public function index(Request $request)
     {
-        // Получаем записи корзины с загруженными продуктами
+     
         $cartItems = Cart::with('product')
             ->where('uid', $request->user()->login)
             ->get();
 
-        // Фильтруем записи, удаляя те, у которых нет продукта
+     
         $cartItems = $cartItems->filter(function ($cartItem) {
             if (!$cartItem->product) {
                 $cartItem->delete();
@@ -174,13 +174,10 @@ class CartController extends Controller
 
             if (!$product) {
                 \Log::error('Product not found', ['product_id' => $productId]);
-                return response()->json(['error' => 'Товар не найден'], 404);
+                return response()->json(['error' => __('messages.product.not_found')], 404);
             }
 
-            // Проверка наличия товара теперь обрабатывается через наблюдатель
-            // Если товара нет в наличии, наблюдатель автоматически удалит его из корзины
-
-            // Проверяем, есть ли товар уже в корзине
+          
             $itemInCart = Cart::where('uid', $userLogin)
                 ->where('pid', $productId)
                 ->first();
@@ -191,36 +188,36 @@ class CartController extends Controller
             ]);
 
             if (!$itemInCart) {
-                // Создаем новую запись в корзине
+                
                 Cart::create([
                     'uid' => $userLogin,
                     'pid' => $productId,
                     'qty' => 1,
                 ]);
                 \Log::info('New cart item created');
-                return response()->json(['success' => 'Товар добавлен в корзину']);
+                return response()->json(['success' => true, 'message' => __('messages.product.added_to_cart')]);
             }
 
-            // Если товар уже в корзине, проверяем лимит
+            
             if ($product->qty > $itemInCart->qty) {
                 $itemInCart->update(['qty' => $itemInCart->qty + 1]);
                 \Log::info('Cart item quantity increased', [
                     'new_qty' => $itemInCart->qty + 1
                 ]);
-                return response()->json(['success' => 'Количество товара увеличено']);
+                return response()->json(['success' => true, 'message' => __('messages.cart.quantity_updated')]);
             }
 
             \Log::error('Product quantity limit reached', [
                 'product_qty' => $product->qty,
                 'cart_qty' => $itemInCart->qty
             ]);
-            return response()->json(['error' => 'Достигнут лимит доступного количества товара'], 400);
+            return response()->json(['error' => __('messages.cart.quantity_limit')], 400);
         } catch (\Exception $e) {
             \Log::error('Error adding to cart', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return response()->json(['error' => 'Произошла ошибка при добавлении товара в корзину'], 500);
+            return response()->json(['error' => __('messages.cart.quantity_error')], 500);
         }
     }
 }

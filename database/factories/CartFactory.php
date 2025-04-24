@@ -13,9 +13,12 @@ class CartFactory extends Factory
 
     public function definition(): array
     {
+        
+        $product = Product::inRandomOrder()->first() ?? Product::factory()->create();
+        
         return [
             'uid' => User::factory(),
-            'pid' => Product::factory(),
+            'pid' => $product->id,
             'qty' => fake()->numberBetween(1, 5),
         ];
     }
