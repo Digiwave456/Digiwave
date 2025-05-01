@@ -32,14 +32,16 @@ class ProfileController extends Controller
 
             foreach ($openedOrder as $orderItem) {
                 $product = Product::find($orderItem->pid);
-                $totalPrice += $product->price * $orderItem->qty;
-                $totalQty += $orderItem->qty;
+                if ($product) {
+                    $totalPrice += $product->price * $orderItem->qty;
+                    $totalQty += $orderItem->qty;
 
-                $products[] = (object)[
-                    'title' => $product->title,
-                    'price' => $product->price,
-                    'qty' => $orderItem->qty,
-                ];
+                    $products[] = (object)[
+                        'title' => $product->title,
+                        'price' => $product->price,
+                        'qty' => $orderItem->qty,
+                    ];
+                }
             }
 
             $goodOrders[] = (object)[
@@ -73,7 +75,7 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return Redirect::route('profile.edit')->with('status', __('messages.success'));
+        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
    
@@ -92,6 +94,6 @@ class ProfileController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return Redirect::to('/')->with('success', __('messages.success'));
+        return Redirect::to('/');
     }
 }

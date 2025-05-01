@@ -18,13 +18,11 @@ class Cart extends Model
         'qty'
     ];
 
-    
     public function user()
     {
         return $this->belongsTo(User::class, 'uid', 'login');
     }
 
-    
     public function product()
     {
         return $this->belongsTo(Product::class, 'pid');

@@ -48,23 +48,20 @@ class ProductController extends Controller
     public function editProduct(Request $request, $id)
     {
         $product = Product::find($id);
-        
+
         if (!$product) {
-            return redirect('/products')->with('error', __('messages.product.not_found'));
+            return abort(404, __('messages.product.not_found'));
         }
 
         $product->update([
-            'title' => $request->input('title'),
-            'price' => $request->input('price'),
-            'description' => $request->input('description'),
-            'qty' => $request->input('qty'),
-            'color' => $request->input('color'),
-            'img' => $request->input('img'),
-            'country' => $request->input('country'),
-            'product_type' => $request->input('category'),
+            'title' => $request->title,
+            'description' => $request->description,
+            'price' => $request->price,
+            'qty' => $request->qty,
+            'product_type' => $request->product_type
         ]);
-        
-        return redirect('/products')->with('success', __('messages.success'));
+
+        return redirect()->route('admin.products')->with('success', __('messages.success'));
     }
 
     public function createProductView()
@@ -76,27 +73,26 @@ class ProductController extends Controller
     public function createProduct(Request $request)
     {
         Product::create([
-            'title' => $request->input('title'),
-            'qty' => $request->input('qty'),
-            'price' => $request->input('price'),
-            'product_type' => $request->input('category'),
-            'img' => $request->input('img'),
-            'country' => $request->input('country'),
-            'color' => $request->input('color'),
+            'title' => $request->title,
+            'description' => $request->description,
+            'price' => $request->price,
+            'qty' => $request->qty,
+            'product_type' => $request->product_type
         ]);
 
         return redirect()->route('admin.products')->with('success', __('messages.success'));
     }
 
-    public function deleteProduct(Request $request)
+    public function deleteProduct($id)
     {
-        $product = Product::find($request->id);
-        
-        if ($product) {
-            $product->delete();
-            return redirect()->route('admin.products')->with('success', __('messages.success'));
+        $product = Product::find($id);
+
+        if (!$product) {
+            return abort(404, __('messages.product.not_found'));
         }
 
-        return redirect()->route('admin.products')->with('error', __('messages.product.not_found'));
+        $product->delete();
+
+        return redirect()->route('admin.products')->with('success', __('messages.success'));
     }
 }

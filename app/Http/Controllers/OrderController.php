@@ -18,16 +18,12 @@ class OrderController extends Controller
         $cart = Cart::where('uid', auth()->user()->login)->get();
         $total = 0;
 
-       
         if ($cart->isEmpty()) {
             return redirect()->route('cart')->with('error', __('messages.cart.empty'));
         }
 
-       
         $productIds = $cart->pluck('pid')->toArray();
         $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
-
-      
 
         foreach ($cart as $item) {
             if (isset($products[$item->pid])) {
@@ -40,39 +36,34 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
-        Log::info('Creating order', ['user_id' => auth()->user()->login]);
+        Log::info('Создание заказа', ['user_id' => auth()->user()->login]);
 
         try {
             $cart = Cart::where('uid', auth()->user()->login)->get();
             
             if ($cart->isEmpty()) {
-                Log::warning('Attempt to create order with empty cart', ['user_id' => auth()->user()->login]);
+                Log::warning('Попытка создания заказа с пустой корзиной', ['user_id' => auth()->user()->login]);
                 return redirect()->route('cart')->with('error', __('messages.cart.empty'));
             }
 
-          
             $productIds = $cart->pluck('pid')->toArray();
             $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-        
             $missingProducts = [];
             foreach ($cart as $item) {
                 if (!isset($products[$item->pid])) {
                     $missingProducts[] = $item->id;
-                    Log::error('Product not found', ['product_id' => $item->pid]);
+                    Log::error('Товар не найден', ['product_id' => $item->pid]);
                 }
             }
             
             if (!empty($missingProducts)) {
-                
                 Cart::whereIn('id', $missingProducts)->delete();
                 return redirect()->route('cart')->with('error', __('messages.product.not_found'));
             }
 
             foreach ($cart as $item) {
                 $product = $products[$item->pid];
-                
-            
 
                 $order = Order::create([
                     'uid' => auth()->user()->login,
@@ -82,7 +73,7 @@ class OrderController extends Controller
                     'status' => __('messages.order.statuses.pending')
                 ]);
 
-                Log::info('Order created', [
+                Log::info('Заказ создан', [
                     'order_id' => $order->id,
                     'product_id' => $item->pid,
                     'quantity' => $item->qty
@@ -92,10 +83,10 @@ class OrderController extends Controller
                 $item->delete();
             }
 
-            Log::info('Order process completed successfully', ['user_id' => auth()->user()->login]);
+            Log::info('Процесс создания заказа успешно завершен', ['user_id' => auth()->user()->login]);
             return redirect()->route('user')->with('success', __('messages.success'));
         } catch (\Exception $e) {
-            Log::error('Error creating order', [
+            Log::error('Ошибка при создании заказа', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -119,11 +110,9 @@ class OrderController extends Controller
 
         $ordersTable = $ordersTable->get()->groupBy('number');
 
-
         $productIds = collect($ordersTable)->flatten()->pluck('pid')->unique()->toArray();
         $allProducts = DB::table('products')->whereIn('id', $productIds)->get()->keyBy('id');
 
-        
         $userLogins = collect($ordersTable)->flatten()->pluck('uid')->unique()->toArray();
         $users = DB::table('users')->whereIn('login', $userLogins)->get()->keyBy('login');
 
@@ -190,13 +179,11 @@ class OrderController extends Controller
             return abort(404, __('messages.order.not_found'));
         }
 
-     
         $orderStatus = $order->first()->status;
         if ($orderStatus !== __('messages.order.statuses.pending')) {
             return back()->with('error', __('messages.order.error'));
         }
 
-       
         $order->delete();
 
         return redirect('/user')->with('success', __('messages.success'));

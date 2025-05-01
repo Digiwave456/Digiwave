@@ -53,4 +53,9 @@ class User extends Authenticatable
     {
         return 'login';
     }
+
+    public function cart()
+    {
+        return $this->hasOne(Cart::class, 'uid', 'login');
+    }
 }
